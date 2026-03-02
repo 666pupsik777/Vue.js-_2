@@ -169,7 +169,6 @@ Vue.component('notepad', {
                 this.columns[to].cards.push(card);
             } else {
                 this.errorMessage = `Столбец "${this.columnTitles[to]}" переполнен!`;
-                // Откатываем чекбокс, если нельзя переместить
                 card.items.forEach(i => i.completed = false);
             }
         },

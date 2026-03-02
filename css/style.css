@@ -67,7 +67,6 @@ body {
     border-left: 4px solid #cbd5e0;
 }
 
-/* Цветные границы для колонок */
 .column:nth-child(3) .card { border-left-color: var(--accent-blue); }
 .column:nth-child(4) .card { border-left-color: var(--accent-green); }
 
@@ -127,14 +126,12 @@ button {
     margin-top: 10px;
 }
 
-/* Убираем стандартные точки у списка в редакторе */
 .card-creator ul {
-    list-style: none; /* Убирает маркеры-точки */
+    list-style: none;
     padding: 0;
     margin-bottom: 15px;
 }
 
-/* Контейнер для строки ввода */
 .creator-item {
     display: flex;
     align-items: center;
@@ -142,11 +139,10 @@ button {
     margin-bottom: 8px;
 }
 
-/* Стили для крестика, который заменяет точку */
 .btn-remove-icon {
     background: none;
     border: none;
-    color: var(--accent-red); /* Используем красный цвет из твоих переменных */
+    color: var(--accent-red);
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
@@ -167,8 +163,7 @@ button {
     cursor: not-allowed;
 }
 
-/* Убираем лишние отступы у инпута, чтобы он стоял ровно */
 .creator-item input {
-    margin-bottom: 0 !important; /* Перекрываем старый отступ */
+    margin-bottom: 0 !important;
     flex-grow: 1;
 }
