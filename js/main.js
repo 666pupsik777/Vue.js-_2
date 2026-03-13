@@ -8,18 +8,36 @@ Vue.component('Card', {
                     type="checkbox" 
                     v-model="item.completed" 
                     @change="updateCompletion" 
-                    :disabled="card.completedDate"
+                    :disabled="isCheckboxDisabled"
                 />
                 <span :class="{ completed: item.completed }">{{ item.text }}</span>
             </li>
         </ul>
-        <div v-if="card.completedDate" class="completed-date">
+        <div v-if="card.completedDate && isLastColumn" class="completed-date">
              Завершено: {{ card.completedDate }}
         </div>
     </div>
     `,
     props: {
         card: Object,
+        isLastColumn: Boolean,
+        columnFull: Boolean,
+        columnIndex: Number
+    },
+    computed: {
+        isCheckboxDisabled() {
+            // Считаем прогресс прямо в карточке
+            const completedCount = this.card.items.filter(i => i.completed).length;
+            const total = this.card.items.length;
+            // Блокируем в 1-м столбце, если 2-й полон, НО даем нажать последнюю галку для 100%
+            if (this.columnIndex === 0 && this.columnFull) {
+                if (completedCount === total - 1 && !this.card.items.every(i => i.completed)) {
+                    return false; // Разрешаем нажать последнюю, чтобы улетела в 3-й столбец
+                }
+                return true;
+            }
+            return false;
+        }
     },
     methods: {
         updateCompletion() {
@@ -33,15 +51,17 @@ Vue.component('column', {
     <div class="column">
         <p>{{ title }}</p>
         <div v-for="card in cards" :key="card.id">
-          <Card :card="card" @update-completion="handleUpdateCompletion" />
+          <Card 
+            :card="card" 
+            :is-last-column="columnIndex === 2"
+            :column-index="columnIndex"
+            :column-full="nextColumnFull"
+            @update-completion="handleUpdateCompletion" 
+          />
         </div>
     </div>
     `,
-    props: {
-        cards: Array,
-        columnIndex: Number,
-        title: String
-    },
+    props: ['cards', 'columnIndex', 'title', 'nextColumnFull'],
     methods: {
         handleUpdateCompletion(cardId) {
             this.$emit('update-completion', cardId);
@@ -55,12 +75,12 @@ Vue.component('notepad', {
             <div class="card-creator">
                 <h3>Новая задача</h3>
                 <input v-model="newCardContent" placeholder="Заголовок карточки" />
-                    <ul>
-                        <li v-for="(item, index) in newCardItems" :key="index" class="creator-item">
-                            <button class="btn-remove-icon" @click="removeItem(index)" :disabled="isCardLocked">×</button>
-                            <input v-model="item.text" placeholder="Введите пункт" :disabled="isCardLocked" />
-                        </li>
-                    </ul>
+                <ul>
+                    <li v-for="(item, index) in newCardItems" :key="index" class="creator-item">
+                        <button class="btn-remove-icon" @click="removeItem(index)">×</button>
+                        <input v-model="item.text" placeholder="Введите текст пункта" />
+                    </li>
+                </ul>
                 
                 <button class="btn-add" @click="addItem" :disabled="newCardItems.length >= 5">
                     + Добавить пункт
@@ -70,7 +90,9 @@ Vue.component('notepad', {
                     Создать карточку
                 </button>
                 
-                <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+                <div v-if="errorMessage" class="error-message" style="color: #ff4d4d; margin-top: 10px;">
+                    {{ errorMessage }}
+                </div>
             </div>
 
             <column
@@ -79,13 +101,14 @@ Vue.component('notepad', {
                 :cards="column.cards"
                 :columnIndex="index"
                 :title="columnTitles[index]"
+                :next-column-full="index === 0 ? columns[1].cards.length >= columns[1].maxCards : false"
                 @update-completion="handleUpdateCompletion"
              />
         </div>
     `,
     data() {
         return {
-            columnTitles: ['Нужно сделать', 'В процессе', 'Завершено'],
+            columnTitles: ['НУЖНО СДЕЛАТЬ', 'В ПРОЦЕССЕ', 'ЗАВЕРШЕНО'],
             columns: [
                 { cards: [], maxCards: 3 },
                 { cards: [], maxCards: 5 },
@@ -98,68 +121,62 @@ Vue.component('notepad', {
     },
     computed: {
         isAddCardDisabled() {
-            const firstColumnFull = this.columns[0].cards.length >= this.columns[0].maxCards;
-            const secondColumnFull = this.columns[1].cards.length >= this.columns[1].maxCards;
-
-            if (secondColumnFull) return true;
-
-            return (
-                firstColumnFull ||
-                this.newCardItems.length < 3 ||
-                this.newCardItems.length > 5 ||
-                !this.newCardContent.trim()
-            );
+            const firstFull = this.columns[0].cards.length >= 3;
+            const hasEmpty = this.newCardItems.some(item => !item.text.trim());
+            return firstFull || this.newCardItems.length < 3 || !this.newCardContent.trim() || hasEmpty;
         },
     },
     methods: {
         addItem() {
-            if (this.newCardItems.length < 5) {
-                this.newCardItems.push({ text: '', completed: false });
-                this.errorMessage = '';
-            }
+            if (this.newCardItems.length < 5) this.newCardItems.push({ text: '', completed: false });
         },
         removeItem(index) {
             this.newCardItems.splice(index, 1);
         },
         addCard() {
-            const newCard = {
+            this.columns[0].cards.push({
                 id: Date.now(),
                 content: this.newCardContent,
-                items: this.newCardItems.map(item => ({ ...item })),
+                items: this.newCardItems.map(item => ({ ...item, text: item.text.trim() })),
                 completedDate: null
-            };
-            this.columns[0].cards.push(newCard);
-            this.resetCardCreator();
-            this.saveData();
-        },
-        resetCardCreator() {
+            });
             this.newCardContent = '';
             this.newCardItems = [];
-            this.errorMessage = '';
+            this.saveData();
         },
         handleUpdateCompletion(cardId) {
-            let currentColumnIndex = -1;
+            let colIdx = -1;
             let card = null;
 
-            for (let i = 0; i < this.columns.length; i++) {
-                card = this.columns[i].cards.find(c => c.id === cardId);
-                if (card) {
-                    currentColumnIndex = i;
-                    break;
-                }
-            }
+            this.columns.forEach((col, idx) => {
+                const found = col.cards.find(c => c.id === cardId);
+                if (found) { card = found; colIdx = idx; }
+            });
 
             if (!card) return;
 
-            const completedCount = card.items.filter(item => item.completed).length;
-            const totalCount = card.items.length;
-            const percent = (completedCount / totalCount) * 100;
+            const percent = (card.items.filter(i => i.completed).length / card.items.length) * 100;
 
-            if (currentColumnIndex === 0 && percent >= 50) {
-                this.moveCard(card, 0, 1);
-            } else if (currentColumnIndex === 1 && percent === 100) {
-                card.completedDate = new Date().toLocaleString();
-                this.moveCard(card, 1, 2);
+            if (colIdx === 0) {
+                if (percent === 100) {
+                    card.completedDate = new Date().toLocaleString();
+                    this.moveCard(card, 0, 2);
+                } else if (percent >= 50) {
+                    this.moveCard(card, 0, 1);
+                }
+            }
+            else if (colIdx === 1) {
+                if (percent === 100) {
+                    card.completedDate = new Date().toLocaleString();
+                    this.moveCard(card, 1, 2);
+                } else if (percent < 50) {
+                    this.moveCard(card, 1, 0);
+                }
+            }
+            else if (colIdx === 2 && percent < 100) {
+                card.completedDate = null;
+                const target = (this.columns[1].cards.length < 5) ? 1 : 0;
+                this.moveCard(card, 2, target);
             }
             this.saveData();
         },
@@ -167,24 +184,19 @@ Vue.component('notepad', {
             if (this.columns[to].cards.length < this.columns[to].maxCards) {
                 this.columns[from].cards = this.columns[from].cards.filter(c => c.id !== card.id);
                 this.columns[to].cards.push(card);
+                this.errorMessage = '';
             } else {
                 this.errorMessage = `Столбец "${this.columnTitles[to]}" переполнен!`;
-                card.items.forEach(i => i.completed = false);
+                this.loadData();
             }
         },
-        saveData() {
-            localStorage.setItem('notepadData', JSON.stringify(this.columns));
-        },
+        saveData() { localStorage.setItem('notepadData', JSON.stringify(this.columns)); },
         loadData() {
-            const savedData = localStorage.getItem('notepadData');
-            if (savedData) {
-                this.columns = JSON.parse(savedData);
-            }
+            const data = localStorage.getItem('notepadData');
+            if (data) this.columns = JSON.parse(data);
         }
     },
-    mounted() {
-        this.loadData();
-    }
+    mounted() { this.loadData(); }
 });
 
 new Vue({ el: '#app' });
