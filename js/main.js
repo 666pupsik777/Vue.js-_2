@@ -152,7 +152,6 @@ Vue.component('notepad', {
             });
 
             if (!card) return;
-
             const percent = (card.items.filter(i => i.completed).length / card.items.length) * 100;
 
             if (colIdx === 0) {
@@ -196,5 +195,6 @@ Vue.component('notepad', {
     },
     mounted() { this.loadData(); }
 });
+
 
 new Vue({ el: '#app' });
