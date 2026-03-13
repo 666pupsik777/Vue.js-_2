@@ -26,13 +26,11 @@ Vue.component('Card', {
     },
     computed: {
         isCheckboxDisabled() {
-            // Считаем прогресс прямо в карточке
             const completedCount = this.card.items.filter(i => i.completed).length;
             const total = this.card.items.length;
-            // Блокируем в 1-м столбце, если 2-й полон, НО даем нажать последнюю галку для 100%
             if (this.columnIndex === 0 && this.columnFull) {
                 if (completedCount === total - 1 && !this.card.items.every(i => i.completed)) {
-                    return false; // Разрешаем нажать последнюю, чтобы улетела в 3-й столбец
+                    return false;
                 }
                 return true;
             }
